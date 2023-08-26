@@ -33,13 +33,13 @@ public sealed class JsonTokenReader
 
     public async ValueTask<JsonToken?> NextAsync(CancellationToken token = default)
     {
-        var read = default(ReadResult);
         while (!token.IsCancellationRequested)
         {
-            read = await _pipe.ReadAsync(token);
-
+            _pipe.TryRead(out var read);
             if (read.IsCanceled || read.IsCompleted)
+            {
                 return null;
+            }
 
             if (ReadNextTokenYouShit(read.Buffer) is (long sz, JsonToken tokeyboi))
             {
@@ -52,6 +52,8 @@ public sealed class JsonTokenReader
             // by saying we've *seen* the whole buffer but only consumed to the beginning
             // of the current span. This will get it to load up to the buffer max size again.
             _pipe.AdvanceTo(read.Buffer.Start, read.Buffer.End);
+
+            _ = await _pipe.ReadAsync(token);
         }
 
         return null;
