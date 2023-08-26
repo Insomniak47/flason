@@ -90,8 +90,8 @@ class Program
 
         // todo: For some reason this wont print the '𝄞' character in pwsh. The bytes are correct so I THINK it's a
         // a problem with the terminal/font but I'm not 100% sure.
-        Console.WriteLine($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
+        //Console.WriteLine($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
         // So that we can get console write times out of the bench
-        //streamyBoi.Write($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
+        streamyBoi.Write($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
     }
 }

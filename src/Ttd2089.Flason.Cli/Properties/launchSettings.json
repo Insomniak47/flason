@@ -2,7 +2,7 @@
   "profiles": {
     "Ttd2089.Flason.Cli": {
       "commandName": "Project",
-      "commandLineArgs": " < \"$(ProjectDir)test.jsonc\""
+      "commandLineArgs": " < \"$(ProjectDir)../../test.json\""
     }
   }
 }

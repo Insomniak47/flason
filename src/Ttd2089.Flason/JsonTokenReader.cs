@@ -11,7 +11,8 @@ public sealed class JsonTokenReader
 {
     private readonly PipeReader _pipe;
     private JsonReaderState _readerState;
-
+    private ReadResult _previousReadResult;
+    private long _currentReadLength = 0;
     public JsonTokenReader(Stream stream, JsonTokenReaderOptions options)
     {
         if (options.InitialBufferSize == 0)
@@ -35,25 +36,25 @@ public sealed class JsonTokenReader
     {
         while (!token.IsCancellationRequested)
         {
-            _pipe.TryRead(out var read);
-            if (read.IsCanceled || read.IsCompleted)
+            if (_previousReadResult.IsCanceled || _previousReadResult.IsCompleted)
             {
                 return null;
             }
 
-            if (ReadNextTokenYouShit(read.Buffer) is (long sz, JsonToken tokeyboi))
+            if (ReadNextTokenYouShit(_previousReadResult.Buffer.Slice(_currentReadLength)) is (long sz, JsonToken tokeyboi))
             {
                 // This is saying we've consumed up to the end read size we got from reader
-                _pipe.AdvanceTo(read.Buffer.GetPosition(sz));
+                _currentReadLength += sz;
+                //_pipe.AdvanceTo(_previousReadResult.Buffer.GetPosition(_currentReadLength));
                 return tokeyboi;
             }
 
             // This advances the "consumed" and the "observed" locations
             // by saying we've *seen* the whole buffer but only consumed to the beginning
             // of the current span. This will get it to load up to the buffer max size again.
-            _pipe.AdvanceTo(read.Buffer.Start, read.Buffer.End);
-
-            _ = await _pipe.ReadAsync(token);
+            _pipe.AdvanceTo(_previousReadResult.Buffer.GetPosition(_currentReadLength), _previousReadResult.Buffer.End);
+            _currentReadLength = 0;
+            _previousReadResult = await _pipe.ReadAsync(token);
         }
 
         return null;
