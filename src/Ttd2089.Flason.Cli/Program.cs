@@ -1,17 +1,16 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
-using Ttd2089.Flason;
 using Rfc6901JsonPointer = Ttd2089.Flason.Rfc6901.JsonPointer;
 using Rfc6901ReferenceToken = Ttd2089.Flason.Rfc6901.ReferenceToken;
 using Rfc6901ReferenceTokenType = Ttd2089.Flason.Rfc6901.ReferenceTokenType;
 
+namespace Ttd2089.Flason.Cli;
+
 class Program
 {
-    private static Stream _nullStream = Stream.Null;
+    private static readonly Stream _nullStream = Stream.Null;
     static async Task Main(string[] args)
     {
         var stream = args.Length == 0 ||  args[0] == "-" 
@@ -22,7 +21,7 @@ class Program
         Console.InputEncoding = Encoding.UTF8;
         Console.OutputEncoding = Encoding.UTF8;
 
-        var channel = Channel.CreateBounded<JsonToken>(new BoundedChannelOptions(4096)
+        var channel = Channel.CreateBounded<JsonToken>(new BoundedChannelOptions(10000)
         {
             SingleReader = true,
             SingleWriter = true,
@@ -48,29 +47,15 @@ class Program
             jsonTokenReader.Run();
         });
 
-        // Console.WriteLine("starting");
+        Console.WriteLine("starting");
         var sw = Stopwatch.StartNew();
         thread.Start();
-        try
-        {
 
-            var firstToken = await channel.Reader.ReadAsync();
-            await WriteFlason(channel.Reader, new(), firstToken);
-            //while (await channel.Reader.WaitToReadAsync())
-            //{
-            //    var t = await channel.Reader.ReadAsync();
-            //    await Console.Out.WriteLineAsync(t.ToString());
-            //}
-        }
-        catch (Exception ex)
-        {
-            await Console.Out.WriteLineAsync("Fucked up");
-            await Console.Out.WriteLineAsync(ex.Message);
-            return;
-        }
+        var firstToken = await channel.Reader.ReadAsync();
+        await WriteFlason(channel.Reader, new(), firstToken);
 
         thread.Join();
-        // Console.WriteLine($"Done in: {sw.Elapsed.TotalSeconds}");
+        Console.WriteLine($"Done in: {sw.Elapsed.TotalSeconds}");
     }
 
 
@@ -98,7 +83,7 @@ class Program
 
     static async ValueTask WriteFlasonObject(ChannelReader<JsonToken> reader, Stack<Rfc6901ReferenceToken> jsonPointer)
     {
-        while ((await reader.ReadAsync()) is JsonToken token && token.Type != JsonTokenType.EndObject)
+        while ((await reader.ReadAsync()) is var token && token.Type != JsonTokenType.EndObject)
         {
             var propertyReferenceToken = new Rfc6901ReferenceToken(
                 Rfc6901ReferenceTokenType.Property,
@@ -115,7 +100,7 @@ class Program
     static async ValueTask WriteFlasonArray(ChannelReader<JsonToken> reader, Stack<Rfc6901ReferenceToken> jsonPointer)
     {
         var index = 0;
-        while ((await reader.ReadAsync()) is JsonToken token && token.Type != JsonTokenType.EndArray)
+        while ((await reader.ReadAsync()) is var token && token.Type != JsonTokenType.EndArray)
         {
             var indexReferenceToken = new Rfc6901ReferenceToken(Rfc6901ReferenceTokenType.Index, $"{index}");
             jsonPointer.Push(indexReferenceToken);
@@ -133,7 +118,7 @@ class Program
 
         // todo: For some reason this wont print the '𝄞' character in pwsh. The bytes are correct so I THINK it's a
         // a problem with the terminal/font but I'm not 100% sure.
-        Console.WriteLine($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
-        // _nullStream.Write(Encoding.UTF8.GetBytes($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}"));
+        // Console.WriteLine($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
+        _nullStream.Write(Encoding.UTF8.GetBytes($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}"));
     }
 }

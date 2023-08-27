@@ -18,9 +18,7 @@ public sealed class JsonTokenReader
     private int _bufferViewStartOffset;
 
     private JsonReaderState _readerState;
-
-    private readonly Queue<string> _shits;
-
+    
     public JsonTokenReader(ChannelWriter<JsonToken> channel, Stream stream, JsonTokenReaderOptions options)
     {
         if (options.InitialBufferSize == 0)
@@ -41,8 +39,6 @@ public sealed class JsonTokenReader
             CommentHandling = options.CommentHandling,
             MaxDepth = options.MaxDepth,
         });
-
-        _shits = new Queue<string>();
     }
 
     public void Run()
@@ -76,24 +72,9 @@ public sealed class JsonTokenReader
         }
 
 
-        var reader = new Utf8JsonReader(_bufferView.Span, isFinalBlock: false, _readerState);
-        bool read = false;
-        try
-        {
-            read = reader.Read();
-        }
-        catch (Exception ex)
-        {
-            int i = 0;
-            Console.Error.WriteLine(ex.Message);
-            Console.Error.WriteLine(Encoding.UTF8.GetString(_bufferView.Span));
-            foreach (var shit in _shits)
-            {
-                Console.Error.WriteLine($"  SHIT: {shit}");
-            }
-            return null;
-            //Environment.Exit(0); // TEMP
-        }
+        var reader = new Utf8JsonReader(_bufferView.Span, isFinalBlock: false, _readerState); 
+        var read = reader.Read();
+
         _bufferView = _bufferView[(int)reader.BytesConsumed..];
         _bufferViewStartOffset += (int)reader.BytesConsumed;
 
@@ -126,12 +107,6 @@ public sealed class JsonTokenReader
         if (read == 0)
         {
             return false;
-        }
-
-        _shits.Enqueue(Encoding.UTF8.GetString(_bufferView.Span));
-        while (_shits.Count > 5)
-        {
-            _shits.Dequeue();
         }
 
         var newBufferViewLength = _bufferView.Length + read;
