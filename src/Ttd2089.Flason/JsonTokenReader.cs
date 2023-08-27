@@ -53,6 +53,7 @@ public sealed class JsonTokenReader
             // read before reading again or shifting the buffer data forward.
             if (ReadNextTokenFromBuffer() is JsonToken token)
             {
+                _channel.WaitToWriteAsync().AsTask().Wait();
                 _channel.TryWrite(token);
                 continue;
             }

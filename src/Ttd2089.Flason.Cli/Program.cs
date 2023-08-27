@@ -11,6 +11,7 @@ using Rfc6901ReferenceTokenType = Ttd2089.Flason.Rfc6901.ReferenceTokenType;
 
 class Program
 {
+    private static Stream _nullStream = Stream.Null;
     static async Task Main(string[] args)
     {
         var stream = args.Length == 0 ||  args[0] == "-" 
@@ -47,6 +48,8 @@ class Program
             jsonTokenReader.Run();
         });
 
+        // Console.WriteLine("starting");
+        var sw = Stopwatch.StartNew();
         thread.Start();
         try
         {
@@ -67,26 +70,12 @@ class Program
         }
 
         thread.Join();
+        // Console.WriteLine($"Done in: {sw.Elapsed.TotalSeconds}");
     }
-
-
-    static int writeDepth = 0;
-    static int objectDepth = 0;
-    static int arrayDepth = 0;
-    static int scalarDepth = 0;
 
 
     static async ValueTask WriteFlason(ChannelReader<JsonToken> reader, Stack<Rfc6901ReferenceToken> jsonPointer, JsonToken? nextToken)
     {
-        Interlocked.Increment(ref writeDepth);
-        await Console.Out.WriteLineAsync($"Write depth is {writeDepth} - Token depth is {nextToken?.Depth ?? 'n'}");
-
-        if (writeDepth > 20)
-        {
-            var i = 0;
-            return;
-        }
-
         if (nextToken is not JsonToken token)
         {
             return;
@@ -104,21 +93,13 @@ class Program
                 WriteFlasonScalar(jsonPointer, token);
                 break;
         }
-        Interlocked.Decrement(ref writeDepth);
 
     }
 
     static async ValueTask WriteFlasonObject(ChannelReader<JsonToken> reader, Stack<Rfc6901ReferenceToken> jsonPointer)
     {
-        Interlocked.Increment(ref objectDepth);
-
-
-
         while ((await reader.ReadAsync()) is JsonToken token && token.Type != JsonTokenType.EndObject)
         {
-            await Console.Out.WriteLineAsync($"obj depth is {objectDepth} - Token depth is {token.Depth}");
-            if (objectDepth > 500) { return; }
-
             var propertyReferenceToken = new Rfc6901ReferenceToken(
                 Rfc6901ReferenceTokenType.Property,
                 Encoding.UTF8.GetString(token.Utf8ValueBytes));
@@ -129,46 +110,30 @@ class Program
 
             jsonPointer.Pop();
         }
-        Interlocked.Decrement(ref objectDepth);
-
     }
 
     static async ValueTask WriteFlasonArray(ChannelReader<JsonToken> reader, Stack<Rfc6901ReferenceToken> jsonPointer)
     {
-        Interlocked.Increment(ref arrayDepth);
         var index = 0;
         while ((await reader.ReadAsync()) is JsonToken token && token.Type != JsonTokenType.EndArray)
         {
-            await Console.Out.WriteLineAsync($"arr depth is {arrayDepth} - Token depth is {token.Depth}");
-            if (arrayDepth > 500) { return; };
             var indexReferenceToken = new Rfc6901ReferenceToken(Rfc6901ReferenceTokenType.Index, $"{index}");
             jsonPointer.Push(indexReferenceToken);
             await WriteFlason(reader, jsonPointer, token);
             jsonPointer.Pop();
             ++index;
         }
-        Interlocked.Decrement(ref arrayDepth);
-        jsonPointer.Pop();
     }
 
     static void WriteFlasonScalar(Stack<Rfc6901ReferenceToken> jsonPointer, JsonToken token)
     {
-        Interlocked.Increment(ref scalarDepth);
-
         var jsonValue = token.Type == JsonTokenType.String
             ? $"\"{Encoding.UTF8.GetString(token.Utf8ValueBytes)}\""
             : $"{Encoding.UTF8.GetString(token.Utf8ValueBytes)}";
 
         // todo: For some reason this wont print the '𝄞' character in pwsh. The bytes are correct so I THINK it's a
         // a problem with the terminal/font but I'm not 100% sure.
-        //Console.WriteLine($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
-        Interlocked.Decrement(ref scalarDepth);
+        Console.WriteLine($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}");
+        // _nullStream.Write(Encoding.UTF8.GetBytes($"\"{new Rfc6901JsonPointer(jsonPointer.Reverse())}\": {jsonValue}"));
     }
-
-    private static JsonToken GetTokenFromReader(Utf8JsonReader reader) => new(
-    type: reader.TokenType,
-    value: reader.ValueSpan,
-    depth: reader.CurrentDepth,
-    valueIsEscaped: reader.ValueIsEscaped);
-
 }
